@@ -1,6 +1,6 @@
 package main
 
-import "dbgraph/cmd"
+import "github.com/alexanderritik/dbgraph/cmd"
 
 var version = "dev"
 

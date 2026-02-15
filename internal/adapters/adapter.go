@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"dbgraph/internal/graph"
+	"github.com/alexanderritik/dbgraph/internal/graph"
 )
 
 // Adapter is the interface that all database adapters must implement

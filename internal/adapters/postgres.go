@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"dbgraph/internal/graph"
+	"github.com/alexanderritik/dbgraph/internal/graph"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

@@ -1,9 +1,10 @@
 package engine
 
 import (
-	"dbgraph/internal/adapters"
-	"dbgraph/internal/graph"
 	"fmt"
+
+	"github.com/alexanderritik/dbgraph/internal/adapters"
+	"github.com/alexanderritik/dbgraph/internal/graph"
 )
 
 // Engine orchestrates the application logic

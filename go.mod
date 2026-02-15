@@ -1,4 +1,4 @@
-module dbgraph
+module github.com/alexanderritik/dbgraph
 
 go 1.25.5
 

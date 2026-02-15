@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"dbgraph/internal/adapters"
-	"dbgraph/internal/engine"
-	"dbgraph/internal/graph"
+	"github.com/alexanderritik/dbgraph/internal/adapters"
+	"github.com/alexanderritik/dbgraph/internal/engine"
+	"github.com/alexanderritik/dbgraph/internal/graph"
 
 	"github.com/spf13/cobra"
 )
