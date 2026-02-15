@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:17.4-alpine
+    container_name: dbgraph_test_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dbgraph_test
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dbgraph_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
