@@ -24,6 +24,14 @@ const (
 	Inheritance   DependencyType = "INHERITANCE" // For partitions
 )
 
+// ColumnDependency represents a database object that depends on a specific column
+type ColumnDependency struct {
+	Schema string
+	Name   string
+	Type   string // "VIEW", "TRIGGER", "INDEX", "FUNCTION", "TABLE"
+	Detail string // e.g., "src code match", "param ref"
+}
+
 // Node represents a database object (Table or View)
 type Node struct {
 	ID       string // Schema.Name
