@@ -248,6 +248,10 @@ var impactCmd = &cobra.Command{
 						if node.EdgeMeta.DeleteRule == "CASCADE" {
 							meta += " (CASCADE)"
 						}
+					} else if node.EdgeMeta.Type == graph.TriggerAction {
+						meta = "(Trigger)"
+					} else if node.EdgeMeta.Type == graph.Inheritance {
+						meta = "(Partition Source)"
 					} else {
 						meta = "(View)"
 					}
@@ -255,6 +259,10 @@ var impactCmd = &cobra.Command{
 				icon := "📥"
 				if node.Type == graph.View {
 					icon = "👁️ "
+				} else if node.Type == graph.Trigger {
+					icon = "⚡"
+				} else if strings.Contains(string(node.Type), "Partition") {
+					icon = "🧩"
 				}
 
 				fRowStr := ""

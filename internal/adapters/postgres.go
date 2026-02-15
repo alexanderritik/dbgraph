@@ -133,8 +133,12 @@ func (p *PostgresAdapter) FetchSchema(g *graph.Graph) error {
 	}
 	defer vRows.Close()
 
+	viewEdges := make(map[string]bool)
 	for vRows.Next() {
 		var vSchema, vName, tSchema, tName string
+		if err := vRows.Scan(&vSchema, &vName, &tSchema, &tName); err != nil {
+			return err
+		}
 		if err := vRows.Scan(&vSchema, &vName, &tSchema, &tName); err != nil {
 			return err
 		}
@@ -144,8 +148,76 @@ func (p *PostgresAdapter) FetchSchema(g *graph.Graph) error {
 		// Ensure Target Node exists
 		g.AddNode(tSchema, tName, graph.Table, "", 0)
 
+		// Deduplicate: Check if edge already processed
+		edgeKey := fmt.Sprintf("%s.%s->%s.%s", vSchema, vName, tSchema, tName)
+		if viewEdges[edgeKey] {
+			continue
+		}
+		viewEdges[edgeKey] = true
+
 		// Add dependency: View -> Target
 		g.AddEdge(vSchema, vName, tSchema, tName, graph.ViewDepends, "", "")
+	}
+
+	// 4. Fetch Triggers & Analyze Function Bodies
+	tRows, err := p.Pool.Query(ctx, queryFetchTriggers)
+	if err == nil {
+		defer tRows.Close()
+		for tRows.Next() {
+			var schema, table, trigger, funcName, level string
+			if err := tRows.Scan(&schema, &table, &trigger, &funcName, &level); err == nil {
+				// Add Trigger Node
+				g.AddNode(schema, trigger, graph.Trigger, "", 0)
+				// Link: Table -> Trigger (Trigger actions ON table)
+				// Note: Originally we did Trigger->Table. But topologically, the Trigger is downstream of Table instructions.
+				// However, if we view it as "Trigger Acts On Table", it might be Trigger -> Table.
+				// Let's keep existing direction: Trigger -> Table (Dependency: Trigger depends on Table existence)
+				g.AddEdge(schema, trigger, schema, table, graph.TriggerAction, "", "")
+
+				// NEW: Fetch Function Body to find downstream dependencies (e.g., Audit Logs)
+				var body string
+				err := p.Pool.QueryRow(ctx, queryFetchFunctionBody, funcName, schema).Scan(&body)
+				if err == nil {
+					// Simple Heuristic: Look for "INSERT INTO <table>", "UPDATE <table>"
+					// We can iterate over all known nodes to see if they are mentioned?
+					// Or just basic regex for "INSERT INTO table"
+					// Let's check against all existing nodes to be safe and accurate.
+					upperBody := strings.ToUpper(body)
+					for id, node := range g.Nodes {
+						// generic check: "INSERT INTO <name>" or "UPDATE <name>"
+						// schema.name or just name
+						// crude check: matches name and is not the source table
+						if id == fmt.Sprintf("%s.%s", schema, table) {
+							continue
+						}
+
+						// Check for "Schema.Name" or "Name" if schema matches
+						// This is expensive O(Triggers * Nodes), but N is small.
+						targetName := node.Name
+						if strings.Contains(upperBody, strings.ToUpper(targetName)) {
+							// Check if it looks like a SQL command
+							// "INSERT INTO target", "UPDATE target"
+							// We'll simplisticly assume if the table name is present, it's a dependency.
+							// Add Edge: Trigger -> TargetTable
+							g.AddEdge(schema, trigger, node.Schema, node.Name, graph.TriggerAction, "Function Call", "")
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 5. Fetch Table Inheritance (Partitions)
+	iRows, err := p.Pool.Query(ctx, queryFetchInheritance)
+	if err == nil {
+		defer iRows.Close()
+		for iRows.Next() {
+			var pSchema, pName, cSchema, cName string
+			if err := iRows.Scan(&pSchema, &pName, &cSchema, &cName); err == nil {
+				// Add dependency: Child -> Parent (Inheritance)
+				g.AddEdge(cSchema, cName, pSchema, pName, graph.Inheritance, "", "")
+			}
+		}
 	}
 
 	return nil
