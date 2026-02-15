@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-REPO="ritiksrivastava/dbgraph" # Replace with actual repo if different
+REPO="alexanderritik/dbgraph" # Replace with actual repo if different
 
 # Fetch latest version tag if no version specified
 if [ -z "$1" ]; then
