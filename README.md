@@ -20,8 +20,27 @@
 
 ## Installation
 
+### Quick Install (Mac & Linux)
+
 ```bash
-go install github.com/yourusername/dbgraph@latest
+curl -fsSL https://raw.githubusercontent.com/ritiksrivastava/dbgraph/main/install.sh | bash
+```
+
+### Manual Install
+
+Download the binary for your OS from the [Releases](https://github.com/ritiksrivastava/dbgraph/releases) page.
+
+```bash
+# Example for macOS ARM64
+curl -L -o dbgraph https://github.com/ritiksrivastava/dbgraph/releases/latest/download/dbgraph-darwin-arm64
+chmod +x dbgraph
+sudo mv dbgraph /usr/local/bin/
+```
+
+### From Source
+
+```bash
+go install github.com/ritiksrivastava/dbgraph@latest
 ```
 
 ## Usage

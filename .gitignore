@@ -1,0 +1,29 @@
+# Binaries
+# if you rename your binary, add it here
+dbgraph
+dbgraph-debug
+*.exe
+*.test
+*.prof
+
+# Build output
+dist/
+vendor/
+scripts/init.sql
+
+# Environment files
+.env
+.env.local
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# OS
+Thumbs.db
+
+# Docker
+docker-compose.yml
