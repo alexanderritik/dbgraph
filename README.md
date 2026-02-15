@@ -15,11 +15,11 @@ Ever deleted a table and accidentally nuked 10 other tables? Or spent hours figu
 | **Hotspot & Query Tracing** | Map slow queries to tables, see index usage, and find your DB’s choke points. |
 | **Schema Diffs** | Compare branches or snapshots — see what changed, what’s risky, and what will break. |
 
-## 🎯 Safety & Performance — Production-Proof
+## 🎯 Safety & Performance — Production-Proof (Zero Impact Promise)
 
-*   **Read-Only Mode** — Never modifies your data. Promise.
-*   **Metadata-Only** — Uses `pg_catalog` + system stats. No heavy `COUNT(*)` on huge tables.
-*   **Lightweight & Fast** — 0.1s per table, even on millions of rows.
+*   **Zero Performance Impact** — It’s lighter than a neutrino. Your database won’t even know we’re there. It has about as much impact on your DB performance as a butterfly landing on a tank. 🦋
+*   **Read-Only Transactions** — We use `SET TRANSACTION READ ONLY`. `dbgraph` couldn't modify your data even if it wanted to. It’s strictly look-but-don’t-touch.
+*   **Metadata-Only Queries** — We query `pg_catalog` (system views), not your 500GB tables. We don't run `COUNT(*)`. We just politely ask Postgres, "Hey, how big is this table?" and Postgres whispers back the stats.
 
 > “I ran `dbgraph impact orders` on our production DB — saw the cascade to 15 tables before I touched a single row. Saved us from a potential outage.” – Anonymous Senior Engineer
 
