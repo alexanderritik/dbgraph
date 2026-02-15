@@ -159,4 +159,121 @@ const (
 		WHERE p.proname = $1 
 		  AND n.nspname = $2
 	`
+
+	// queryGetColumnAttNum fetches specific attribute number
+	queryGetColumnAttNum = `
+		SELECT a.attnum
+		FROM pg_attribute a
+		JOIN pg_class c ON a.attrelid = c.oid
+		JOIN pg_namespace n ON c.relnamespace = n.oid
+		WHERE n.nspname = $1 AND c.relname = $2 AND a.attname = $3
+	`
+
+	// queryColumnDependencies (Broader)
+	queryColumnDependencies = `
+		SELECT
+			d.classid::regclass::text AS dependant_type,
+			CASE 
+				WHEN d.classid = 'pg_rewrite'::regclass THEN (
+					SELECT ev_class::regclass::text FROM pg_rewrite WHERE oid = d.objid
+				)
+				WHEN d.classid = 'pg_trigger'::regclass THEN (
+					SELECT tgname FROM pg_trigger WHERE oid = d.objid
+				)
+				WHEN d.classid = 'pg_constraint'::regclass THEN (
+					SELECT conname FROM pg_constraint WHERE oid = d.objid
+				)
+				WHEN d.classid = 'pg_attrdef'::regclass THEN 'DEFAULT VALUE'
+				WHEN d.classid = 'pg_class'::regclass THEN d.objid::regclass::text
+				ELSE 'OID:' || d.objid::text
+			END AS dependant_name,
+			d.deptype::text,
+			n.nspname AS schema_name
+		FROM pg_depend d
+		JOIN pg_attribute a ON d.refobjid = a.attrelid AND d.refobjsubid = a.attnum
+		JOIN pg_class c ON d.refobjid = c.oid
+		JOIN pg_namespace n ON c.relnamespace = n.oid
+		WHERE c.relname = $1
+		  AND n.nspname = $2
+		  AND a.attname = $3
+		  -- Removed strict deptype filtering to catch everything
+	`
+
+	// queryFKRefsByColumn finds FKs that reference this specific column
+	queryFKRefsByColumn = `
+		SELECT 
+			con.conname,
+			con.conrelid::regclass::text AS source_table
+		FROM pg_constraint con
+		JOIN pg_class c ON con.confrelid = c.oid
+		JOIN pg_namespace n ON c.relnamespace = n.oid
+		WHERE n.nspname = $1 
+		  AND c.relname = $2
+		  AND con.contype = 'f'
+		  AND $3 = ANY(con.confkey)
+	`
+
+	// queryIndexesByColumn finds indexes using this column
+	queryIndexesByColumn = `
+		SELECT 
+			ix.indexrelid::regclass::text AS index_name
+		FROM pg_index ix
+		JOIN pg_class c ON ix.indrelid = c.oid
+		JOIN pg_namespace n ON c.relnamespace = n.oid
+		WHERE n.nspname = $1
+		  AND c.relname = $2
+		  AND $3 = ANY(ix.indkey)
+	`
+
+	// queryScanFunctionsForColumn usage scans function bodies for column usage (regex/text search)
+	queryScanFunctionsForColumn = `
+		SELECT
+			n.nspname AS schema_name,
+			p.proname AS function_name,
+			p.prosrc AS source_code
+		FROM pg_proc p
+		JOIN pg_namespace n ON p.pronamespace = n.oid
+		WHERE n.nspname NOT IN ('information_schema', 'pg_catalog')
+		  AND p.prosrc ILIKE '%' || $1 || '%'
+	`
+
+	// queryTableDependencies fetches objects that depend on a whole table
+	queryTableDependencies = `
+		SELECT
+			d.classid::regclass::text AS dependant_type,
+			CASE 
+				WHEN d.classid = 'pg_rewrite'::regclass THEN (
+					SELECT ev_class::regclass::text FROM pg_rewrite WHERE oid = d.objid
+				)
+				WHEN d.classid = 'pg_trigger'::regclass THEN (
+					SELECT tgname FROM pg_trigger WHERE oid = d.objid
+				)
+				WHEN d.classid = 'pg_constraint'::regclass THEN (
+					SELECT conname FROM pg_constraint WHERE oid = d.objid
+				)
+				WHEN d.classid = 'pg_type'::regclass THEN d.objid::regtype::text
+				ELSE d.objid::regclass::text
+			END AS dependant_name,
+			d.deptype::text,
+			n.nspname AS schema_name
+		FROM pg_depend d
+		JOIN pg_class c ON d.refobjid = c.oid
+		JOIN pg_namespace n ON c.relnamespace = n.oid
+		WHERE c.relname = $1
+		  AND n.nspname = $2
+		  -- Removed refobjsubid=0 to catch dependencies on columns too
+	`
+
+	// queryFKRefsByTable finds FKs pointing TO this table
+	queryFKRefsByTable = `
+		SELECT 
+			con.conname,
+			con.conrelid::regclass::text AS source_table
+		FROM pg_constraint con
+		JOIN pg_class fcl ON con.confrelid = fcl.oid
+		JOIN pg_namespace fns ON fcl.relnamespace = fns.oid
+		WHERE fns.nspname = $1 
+		  AND fcl.relname = $2
+		  AND con.contype = 'f' -- Foreign Key
+	`
 )

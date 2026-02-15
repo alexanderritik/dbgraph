@@ -271,3 +271,236 @@ func (p *PostgresAdapter) GetMetrics() (*graph.DBMetrics, error) {
 
 	return m, nil
 }
+
+// GetColumnDependencies identifies all objects that depend on a specific column
+func (p *PostgresAdapter) GetColumnDependencies(schema, table, column string) ([]graph.ColumnDependency, error) {
+	if p.Pool == nil {
+		return nil, fmt.Errorf("database connection not established")
+	}
+	ctx := context.Background()
+	var deps []graph.ColumnDependency
+
+	// 0. Get Attribute Number for robust querying
+	var attNum int
+	err := p.Pool.QueryRow(ctx, queryGetColumnAttNum, schema, table, column).Scan(&attNum)
+	if err != nil {
+		// If column doesn't exist, return error
+		return nil, fmt.Errorf("column '%s.%s' not found: %w", table, column, err)
+	}
+
+	// 1. Foreign Keys referencing this column
+	fkRows, err := p.Pool.Query(ctx, queryFKRefsByColumn, schema, table, attNum)
+	if err == nil {
+		defer fkRows.Close()
+		for fkRows.Next() {
+			var conName, srcTable string
+			if err := fkRows.Scan(&conName, &srcTable); err == nil {
+				deps = append(deps, graph.ColumnDependency{
+					Schema: schema, // Technically referencing table might be elsewhere, but keeping simpler for now
+					Name:   srcTable,
+					Type:   "FOREIGN_KEY",
+					Detail: fmt.Sprintf("Constraint: %s", conName),
+				})
+			}
+		}
+	}
+
+	// 2. Indexes using this column
+	ixRows, err := p.Pool.Query(ctx, queryIndexesByColumn, schema, table, attNum)
+	if err == nil {
+		defer ixRows.Close()
+		for ixRows.Next() {
+			var indexName string
+			if err := ixRows.Scan(&indexName); err == nil {
+				deps = append(deps, graph.ColumnDependency{
+					Schema: schema,
+					Name:   indexName,
+					Type:   "INDEX",
+					Detail: "Index covers this column",
+				})
+			}
+		}
+	}
+
+	// 3. Direct Dependencies via pg_depend (Views, Triggers, etc.)
+	rows, err := p.Pool.Query(ctx, queryColumnDependencies, table, schema, column)
+	if err != nil {
+		fmt.Printf("Warning: failed to fetch pg_depend: %v\n", err)
+	} else {
+		defer rows.Close()
+		for rows.Next() {
+			var depType, depName, depCode, depSchema string
+			if err := rows.Scan(&depType, &depName, &depCode, &depSchema); err != nil {
+				continue
+			}
+
+			// Refine Type
+			readableType := "UNKNOWN"
+			if strings.Contains(depType, "rewrite") {
+				readableType = "VIEW"
+			} else if strings.Contains(depType, "trigger") {
+				readableType = "TRIGGER"
+			} else if strings.Contains(depType, "class") {
+				readableType = "RELATION" // Could be View, Table, Index
+				if depName == table || strings.Contains(depName, table) {
+					// Self references (like PK index) are interesting but maybe filtered if needed
+					// But "id" dropping breaks the table itself effectively?
+					// No, it breaks the PK.
+				}
+			}
+
+			// Deduplicate: If we already found this via FK/Index query, skip?
+			// Simple check:
+			seen := false
+			for _, d := range deps {
+				if d.Name == depName {
+					seen = true
+					break
+				}
+			}
+			if !seen {
+				deps = append(deps, graph.ColumnDependency{
+					Schema: depSchema,
+					Name:   depName,
+					Type:   readableType,
+					Detail: fmt.Sprintf("Deep Dependency (%s)", depCode),
+				})
+			}
+		}
+		if err := rows.Err(); err != nil {
+			fmt.Printf("Warning: error iterating pg_depend: %v\n", err)
+		}
+	}
+
+	// 4. Scan Function Bodies (Soft Dependencies)
+	fRows, err := p.Pool.Query(ctx, queryScanFunctionsForColumn, column)
+	if err == nil {
+		defer fRows.Close()
+		for fRows.Next() {
+			var fSchema, fName, fSrc string
+			if err := fRows.Scan(&fSchema, &fName, &fSrc); err != nil {
+				continue
+			}
+			if strings.Contains(strings.ToUpper(fSrc), strings.ToUpper(table)) {
+				deps = append(deps, graph.ColumnDependency{
+					Schema: fSchema,
+					Name:   fName,
+					Type:   "FUNCTION",
+					Detail: "Code Reference (Regex Scan)",
+				})
+			}
+		}
+	}
+
+	return deps, nil
+}
+
+// GetTableDependencies identifies all objects that depend on a specific table
+func (p *PostgresAdapter) GetTableDependencies(schema, table string) ([]graph.ColumnDependency, error) {
+	if p.Pool == nil {
+		return nil, fmt.Errorf("database connection not established")
+	}
+	ctx := context.Background()
+	var deps []graph.ColumnDependency
+
+	// 1. Foreign Keys pointing TO this table
+	fkRows, err := p.Pool.Query(ctx, queryFKRefsByTable, schema, table)
+	if err == nil {
+		defer fkRows.Close()
+		for fkRows.Next() {
+			var conName, srcTable string
+			if err := fkRows.Scan(&conName, &srcTable); err == nil {
+				deps = append(deps, graph.ColumnDependency{
+					Schema: schema,
+					Name:   srcTable,
+					Type:   "FOREIGN_KEY",
+					Detail: fmt.Sprintf("Constraint: %s", conName),
+				})
+			}
+		}
+	}
+
+	// 2. Direct Dependencies via pg_depend (Views, Triggers, Mat Views)
+	rows, err := p.Pool.Query(ctx, queryTableDependencies, table, schema)
+	if err != nil {
+		fmt.Printf("Warning: failed to fetch table dependencies: %v\n", err)
+	} else {
+		defer rows.Close()
+		for rows.Next() {
+			var depType, depName, depCode, depSchema string
+			if err := rows.Scan(&depType, &depName, &depCode, &depSchema); err != nil {
+				continue
+			}
+
+			// Filter: Only show 'n' (Normal) dependencies.
+			// 'a' (Automatic) and 'i' (Internal) are deleted with the table, so they are not "blockers" or "breakages" in the same sense.
+			// Exception: We might want to warn about Cascades? But standard 'n' means restricted.
+			if depCode != "n" {
+				continue
+			}
+
+			readableType := "UNKNOWN"
+			if strings.Contains(depType, "rewrite") {
+				readableType = "VIEW"
+			} else if strings.Contains(depType, "trigger") {
+				readableType = "TRIGGER"
+			} else if strings.Contains(depType, "constraint") {
+				readableType = "CONSTRAINT"
+			} else if strings.Contains(depType, "class") {
+				readableType = "RELATION"
+			}
+
+			// Deduplicate
+			seen := false
+			for _, d := range deps {
+				if d.Name == depName {
+					seen = true
+					break
+				}
+				// Check if this dependency (e.g. Constraint Name) is already mentioned in Detail of another dep
+				if strings.Contains(d.Detail, depName) {
+					seen = true
+					break
+				}
+			}
+
+			if !seen {
+				deps = append(deps, graph.ColumnDependency{
+					Schema: depSchema,
+					Name:   depName,
+					Type:   readableType,
+					Detail: fmt.Sprintf("Hard Dependency (%s)", depCode),
+				})
+			}
+		}
+		if err := rows.Err(); err != nil {
+			fmt.Printf("Warning: error iterating pg_depend table: %v\n", err)
+		}
+	}
+
+	// 3. Scan Function Bodies (Soft Dependencies)
+	fRows, err := p.Pool.Query(ctx, queryScanFunctionsForColumn, table)
+	if err == nil {
+		defer fRows.Close()
+		for fRows.Next() {
+			var fSchema, fName, fSrc string
+			if err := fRows.Scan(&fSchema, &fName, &fSrc); err != nil {
+				continue
+			}
+			// Strict check: contains "schem.table" or "table"
+			// Case insensitive
+			upperSrc := strings.ToUpper(fSrc)
+			upperTable := strings.ToUpper(table)
+			if strings.Contains(upperSrc, upperTable) {
+				deps = append(deps, graph.ColumnDependency{
+					Schema: fSchema,
+					Name:   fName,
+					Type:   "FUNCTION",
+					Detail: "Code Reference (Regex Scan)",
+				})
+			}
+		}
+	}
+
+	return deps, nil
+}

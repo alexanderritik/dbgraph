@@ -13,6 +13,8 @@ type Adapter interface {
 	Close()
 	FetchSchema(g *graph.Graph) error
 	GetMetrics() (*graph.DBMetrics, error)
+	GetColumnDependencies(schema, table, column string) ([]graph.ColumnDependency, error)
+	GetTableDependencies(schema, table string) ([]graph.ColumnDependency, error)
 }
 
 // NewAdapter creates a new adapter based on the connection string scheme
