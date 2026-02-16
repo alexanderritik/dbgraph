@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -503,7 +504,6 @@ func (p *PostgresAdapter) GetTableDependencies(schema, table string) ([]graph.Co
 	}
 
 	return deps, nil
-	return deps, nil
 }
 
 // GetTopQueries fetches the top costly queries from pg_stat_statements
@@ -552,4 +552,81 @@ func (p *PostgresAdapter) GetTopQueries(limit int, sortBy string) ([]graph.Query
 	}
 
 	return stats, nil
+}
+
+// TraceQuery executes a query with EXPLAIN (ANALYZE, BUFFERS) and returns performance data
+func (p *PostgresAdapter) TraceQuery(query string) (*graph.TraceResult, error) {
+	if p.Pool == nil {
+		return nil, fmt.Errorf("database connection not established")
+	}
+
+	ctx := context.Background()
+
+	// Start a transaction to ensure session-level settings (SET LOCAL) are applied to the query
+	tx, err := p.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for trace: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Apply Safety Wrappers
+	// Kill trace if it looks like it will hang (>5s)
+	if _, err := tx.Exec(ctx, "SET local statement_timeout = '5000ms'"); err != nil {
+		return nil, fmt.Errorf("failed to set statement_timeout: %w", err)
+	}
+	// Limit memory usage
+	if _, err := tx.Exec(ctx, "SET local work_mem = '64MB'"); err != nil {
+		return nil, fmt.Errorf("failed to set work_mem: %w", err)
+	}
+
+	// 2. Prepare EXPLAIN command
+	traceSQL := fmt.Sprintf("EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) %s", query)
+
+	// 3. Execute
+	var jsonOutput []byte
+	err = tx.QueryRow(ctx, traceSQL).Scan(&jsonOutput)
+	if err != nil {
+		return nil, fmt.Errorf("trace execution failed: %w", err)
+	}
+
+	// 4. Parse JSON
+	var explainParams []graph.ExplainOutput
+	if err := json.Unmarshal(jsonOutput, &explainParams); err != nil {
+		return nil, fmt.Errorf("failed to parse explain json: %w", err)
+	}
+
+	if len(explainParams) == 0 {
+		return nil, fmt.Errorf("empty explain result")
+	}
+
+	result := explainParams[0]
+	root := result.Plan
+
+	// 5. Aggregate Stats
+	traceResult := &graph.TraceResult{
+		PlanningTime:  result.PlanningTime,
+		ExecutionTime: result.ExecutionTime,
+		TotalTime:     result.PlanningTime + result.ExecutionTime,
+		Root:          root,
+	}
+
+	// Aggregate I/O from the tree (Recursively)
+	var walk func(node *graph.ExplainNode)
+	walk = func(node *graph.ExplainNode) {
+		if node == nil {
+			return
+		}
+
+		traceResult.CacheHits += node.SharedHitBlocks
+		traceResult.DiskReads += node.SharedReadBlocks
+		// Also include Local/Temp if needed
+		// traceResult.MemoryUsage += ...
+
+		for _, child := range node.Plans {
+			walk(child)
+		}
+	}
+	walk(root)
+
+	return traceResult, nil
 }
