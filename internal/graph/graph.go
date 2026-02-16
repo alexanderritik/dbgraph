@@ -52,6 +52,16 @@ type DBMetrics struct {
 	ConnSaturation string // e.g. "82%"
 }
 
+// QueryStats represents performance statistics for a single query
+type QueryStats struct {
+	QueryID     string
+	Query       string
+	Calls       int64
+	TotalTime   float64 // milliseconds
+	AvgTime     float64 // milliseconds
+	LoadPercent float64
+}
+
 // Edge represents a dependency: Source -> Target
 // If A has FK to B, A depends on B. So Edge is A -> B.
 type Edge struct {

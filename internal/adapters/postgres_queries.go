@@ -276,4 +276,27 @@ const (
 		  AND fcl.relname = $2
 		  AND con.contype = 'f' -- Foreign Key
 	`
+
+	// queryTopQueries fetches top queries from pg_stat_statements
+	// Note: The ordering clause will be injected dynamically.
+	queryTopQueries = `
+		WITH stats AS (
+			SELECT 
+				queryid, 
+				query, 
+				calls, 
+				(total_plan_time + total_exec_time) as total_time,
+				((total_plan_time + total_exec_time) / calls) as avg_time
+			FROM pg_stat_statements
+			WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database())
+		)
+		SELECT 
+			queryid,
+			query,
+			calls,
+			total_time,
+			avg_time,
+			(total_time * 100 / SUM(total_time) OVER()) as load_percent
+		FROM stats
+	`
 )
