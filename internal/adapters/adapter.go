@@ -16,6 +16,7 @@ type Adapter interface {
 	GetColumnDependencies(schema, table, column string) ([]graph.ColumnDependency, error)
 	GetTableDependencies(schema, table string) ([]graph.ColumnDependency, error)
 	GetTopQueries(limit int, sortBy string) ([]graph.QueryStats, error)
+	TraceQuery(query string) (*graph.TraceResult, error)
 }
 
 // NewAdapter creates a new adapter based on the connection string scheme
