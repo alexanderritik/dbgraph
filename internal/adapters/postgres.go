@@ -503,4 +503,53 @@ func (p *PostgresAdapter) GetTableDependencies(schema, table string) ([]graph.Co
 	}
 
 	return deps, nil
+	return deps, nil
+}
+
+// GetTopQueries fetches the top costly queries from pg_stat_statements
+func (p *PostgresAdapter) GetTopQueries(limit int, sortBy string) ([]graph.QueryStats, error) {
+	if p.Pool == nil {
+		return nil, fmt.Errorf("database connection not established")
+	}
+
+	// 1. Determine ORDER BY clause safely
+	var orderBy string
+	switch sortBy {
+	case "calls":
+		orderBy = "ORDER BY calls DESC"
+	case "avg_time":
+		orderBy = "ORDER BY avg_time DESC"
+	case "total", "total_time":
+		orderBy = "ORDER BY total_time DESC"
+	default:
+		orderBy = "ORDER BY total_time DESC"
+	}
+
+	// 2. Construct final query
+	finalQuery := fmt.Sprintf("%s %s LIMIT $1", queryTopQueries, orderBy)
+
+	// 3. Execute
+	rows, err := p.Pool.Query(context.Background(), finalQuery, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch top queries (ensure pg_stat_statements is enabled): %w", err)
+	}
+	defer rows.Close()
+
+	var stats []graph.QueryStats
+	for rows.Next() {
+		var q graph.QueryStats
+		// Scan queryid as specific type? pgx handles it?
+		// Ensure types match SQL: queryid (int8 or int64), query (text), calls (int8), total_time (float8), avg_time (float8), load_percent (float8)
+		// Usually queryid is int64. Let's see.
+		// If queryid is null? It's PK so shouldn't be.
+		// Actually pg_stat_statements queryid is bigint.
+		var qid int64
+		if err := rows.Scan(&qid, &q.Query, &q.Calls, &q.TotalTime, &q.AvgTime, &q.LoadPercent); err != nil {
+			return nil, err
+		}
+		q.QueryID = fmt.Sprintf("%d", qid)
+		stats = append(stats, q)
+	}
+
+	return stats, nil
 }
