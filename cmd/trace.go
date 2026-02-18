@@ -20,10 +20,8 @@ var traceCmd = &cobra.Command{
 	Short: "Analyze a SELECT query with detailed execution stats",
 	Long:  `Executes a SELECT query with EXPLAIN (ANALYZE, BUFFERS) and visualizes the execution path, latency, and I/O efficiency.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if dbUrl == "" {
-			fmt.Println("Error: --db flag is required")
-			os.Exit(1)
-		}
+		ensureDBConnection()
+
 		if traceQueryString == "" {
 			fmt.Println("Error: --query flag is required")
 			os.Exit(1)
@@ -110,7 +108,6 @@ var traceCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(traceCmd)
-	traceCmd.Flags().StringVar(&dbUrl, "db", "", "Database connection string")
 	traceCmd.Flags().StringVar(&traceQueryString, "query", "", "The SELECT query to trace")
 }
 

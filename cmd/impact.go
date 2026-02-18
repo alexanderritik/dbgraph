@@ -20,13 +20,10 @@ var impactCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		tableName := args[0]
-		if dbUrl == "" {
-			fmt.Println("Error: --db flag is required")
-			os.Exit(1)
-		}
+		ensureDBConnection()
 
 		g := graph.NewGraph()
-
+		// ... existing code ...
 		// Use the factory to get the correct adapter
 		a, err := adapters.NewAdapter(dbUrl)
 		if err != nil {
@@ -312,5 +309,4 @@ var impactCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(impactCmd)
-	impactCmd.Flags().StringVar(&dbUrl, "db", "", "Database connection string")
 }

@@ -22,13 +22,10 @@ var summaryCmd = &cobra.Command{
 	Short: "Print a high-level architectural summary of the database",
 	Long:  `Displays a ranked table of database objects based on their topological impact (Centrality), Risk, and Connectivity.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if dbUrl == "" {
-			fmt.Println("Error: --db flag is required")
-			os.Exit(1)
-		}
+		ensureDBConnection()
 
 		g := graph.NewGraph()
-
+		// ... existing code ...
 		// Use the factory to get the correct adapter
 		a, err := adapters.NewAdapter(dbUrl)
 		if err != nil {
@@ -114,7 +111,6 @@ var summaryCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(summaryCmd)
-	summaryCmd.Flags().StringVar(&dbUrl, "db", "", "Database connection string")
 	summaryCmd.Flags().BoolVar(&showAll, "all", false, "Show all objects")
 	summaryCmd.Flags().IntVar(&limitRows, "limit", 10, "Number of rows to show")
 }

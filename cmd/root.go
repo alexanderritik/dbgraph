@@ -23,6 +23,20 @@ func Execute(version string) {
 	}
 }
 
+var dbUrl string
+
 func init() {
-	// Add global flags here if needed
+	rootCmd.PersistentFlags().StringVar(&dbUrl, "db", "", "Database connection string (or env DBGRAPH_DB_URL)")
+}
+
+// ensureDBConnection checks if dbUrl is set, otherwise tries to read from env
+func ensureDBConnection() {
+	if dbUrl == "" {
+		dbUrl = os.Getenv("DBGRAPH_DB_URL")
+	}
+
+	if dbUrl == "" {
+		fmt.Println("Error: --db flag or DBGRAPH_DB_URL environment variable is required")
+		os.Exit(1)
+	}
 }

@@ -26,10 +26,7 @@ var topCmd = &cobra.Command{
 	Short: "Real-time query performance monitoring (like htop)",
 	Long:  `Displays a ranking of the most resource-intensive queries in real-time.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if dbUrl == "" {
-			fmt.Println("Error: --db flag is required")
-			os.Exit(1)
-		}
+		ensureDBConnection()
 
 		// Connect
 		a, err := adapters.NewAdapter(dbUrl)
@@ -162,7 +159,6 @@ func truncate(s string, max int) string {
 
 func init() {
 	rootCmd.AddCommand(topCmd)
-	topCmd.Flags().StringVar(&dbUrl, "db", "", "Database connection string")
 	topCmd.Flags().IntVar(&topInterval, "interval", 5, "Seconds between refreshes")
 	topCmd.Flags().StringVar(&topSort, "sort", "total", "Sort by total_time, calls, or avg_time")
 	topCmd.Flags().IntVar(&topLimit, "limit", 10, "How many queries to show")

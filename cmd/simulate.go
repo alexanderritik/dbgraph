@@ -16,10 +16,7 @@ var simulateCmd = &cobra.Command{
 	Short: "Simulate schema changes and predict impact",
 	Long:  `Simulates schema changes (like dropping a column) and reports impacted database objects using strict dependency analysis and code scanning.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if dbUrl == "" {
-			fmt.Println("Error: --db flag is required")
-			os.Exit(1)
-		}
+		ensureDBConnection()
 
 		dropCol, _ := cmd.Flags().GetString("drop-column")
 		dropTbl, _ := cmd.Flags().GetString("drop-table")
@@ -127,7 +124,6 @@ func printSafetyVerdict(target string, deps []graph.ColumnDependency) {
 
 func init() {
 	rootCmd.AddCommand(simulateCmd)
-	simulateCmd.Flags().StringVar(&dbUrl, "db", "", "Database connection string")
 	simulateCmd.Flags().String("drop-column", "", "Column to simulate dropping (format: table.column)")
 	simulateCmd.Flags().String("drop-table", "", "Table to simulate dropping (format: table)")
 }
