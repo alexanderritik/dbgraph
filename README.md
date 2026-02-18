@@ -1,10 +1,14 @@
 # dbgraph
 
-**The missing schema dependency analyzer for PostgreSQL.**
+**The missing schema dependency analyzer for databases.**
+
+> **Note:** Currently supports **PostgreSQL**. MySQL and NoSQL support is coming soon!
 
 `dbgraph` is a CLI tool designed for engineering teams who need to understand their database schema's web of dependencies instantly. It answers the question: *"If I drop this table or change this column, what breaks?"* without requiring a full code audit.
 
 Unlike heavy GUI tools or passive log analyzers, `dbgraph` is an active, graph-based explorer that runs in your terminal, offering immediate insights into schema risks, query performance, and architectural hotspots.
+
+![Demo](demo.gif)
 
 ---
 
