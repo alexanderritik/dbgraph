@@ -1,4 +1,14 @@
-# dbgraph
+<div align="center">
+
+![dbgraph logo](logo.svg)
+
+</div>
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/alexanderritik/dbgraph)](https://goreportcard.com/report/github.com/alexanderritik/dbgraph)
+[![Go Reference](https://pkg.go.dev/badge/github.com/alexanderritik/dbgraph.svg)](https://pkg.go.dev/github.com/alexanderritik/dbgraph)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/v/release/alexanderritik/dbgraph)](https://github.com/alexanderritik/dbgraph/releases)
+
 
 **The missing schema dependency analyzer for databases.**
 
@@ -113,4 +123,5 @@ We are just getting started! `dbgraph` is built to evolve, and we want to suppor
 Missing something critical? [Open an issue](https://github.com/alexanderritik/dbgraph/issues) or contribute a PR. We love building with the community.
 
 ## License
-MIT
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
