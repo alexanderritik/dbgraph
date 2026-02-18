@@ -42,6 +42,40 @@ var analyzeCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		// DOT Export Logic
+		format, _ := cmd.Flags().GetString("format")
+		if format == "dot" {
+			fmt.Println("digraph dbgraph {")
+			fmt.Println("  rankdir=LR;")
+			fmt.Println("  node [shape=box, style=filled, fillcolor=\"#e2e8f0\", fontname=\"Helvetica\"];")
+			fmt.Println("  edge [color=\"#64748b\"];")
+
+			// Nodes
+			for id, n := range g.Nodes {
+				label := fmt.Sprintf("%s\\n(%s)", n.Name, n.Type)
+				color := "#e2e8f0"
+				if n.Type == graph.Table {
+					color = "#bfdbfe" // Blue
+				} else if n.Type == graph.View {
+					color = "#bbf7d0" // Green
+				}
+				fmt.Printf("  \"%s\" [label=\"%s\", fillcolor=\"%s\"];\n", id, label, color)
+			}
+
+			// Edges
+			for src, edges := range g.Edges {
+				for _, e := range edges {
+					style := "solid"
+					if e.Type == graph.ViewDepends {
+						style = "dashed"
+					}
+					fmt.Printf("  \"%s\" -> \"%s\" [style=%s];\n", src, e.TargetID, style)
+				}
+			}
+			fmt.Println("}")
+			return // Exit after printing DOT
+		}
+
 		// Perform Topological Analysis
 		stats := g.AnalyzeTopology()
 
@@ -170,4 +204,5 @@ var analyzeCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(analyzeCmd)
+	analyzeCmd.Flags().String("format", "text", "Output format: text or dot")
 }

@@ -28,7 +28,6 @@ func (e *Engine) Connect(connString string) error {
 
 // BuildGraph fetches the schema and builds the graph
 func (e *Engine) BuildGraph() error {
-	fmt.Println("Building graph from database schema...")
 	return e.Adapter.FetchSchema(e.Graph)
 }
 

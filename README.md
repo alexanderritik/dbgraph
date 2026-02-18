@@ -1,3 +1,4 @@
+# dbgraph
 <div align="center">
 
 ![dbgraph logo](logo.svg)
@@ -54,13 +55,22 @@ set `DBGRAPH_DB_URL` environment variable for seamless usage, or use `--db` flag
 | **Query Performance** | `top` | `dbgraph top --watch` | Real-time `htop` for your queries. Spot bottleneck queries instantly with live load metrics and execution frequency. |
 | **Query Tracing** | `trace` | `dbgraph trace --query "SELECT * FROM users..."` | Runs `EXPLAIN (ANALYZE, BUFFERS)` and visualizes the execution path, cache hits, and I/O latency in a readable tree format. |
 | **Architectural Summary** | `summary` | `dbgraph summary` | High-level ranking of your "God Objects" and riskiest tables based on centrality and connectedness. |
+| **Graph Export** | `analyze` | `dbgraph analyze --format=dot > schema.dot` | Exports your entire schema dependency graph to **Dot/Graphviz** format. visualizes complex relationships. |
 | **Full Analysis** | `analyze` | `dbgraph analyze` | Performs a deep health check: finds circular dependencies, missing indexes on FKs, and isolated schema islands. |
 
 ---
 
 ## 🔍 Deep Dive
 
-### 1. Structural Impact Analysis
+### 1. 📸 Visualizing Your Schema
+Turn your database into a picture. `dbgraph` can export the internal graph to DOT format, which you can render using Graphviz or online viewers.
+
+```bash
+$ dbgraph analyze --format=dot > graph.dot
+$ dot -Tpng graph.dot -o graph.png
+```
+
+### 2. Structural Impact Analysis
 Avoid downtime caused by unintended cascades. `dbgraph` builds a Directed Acyclic Graph (DAG) of your schema constraints.
 
 ```bash
@@ -74,7 +84,7 @@ $ dbgraph impact orders
     └── ⚡ trigger_update_inventory
 ```
 
-### 2. "What-If" Simulations
+### 3. "What-If" Simulations
 Planning a refactor? Simulate it first.
 ```bash
 $ dbgraph simulate --drop-column users.country_code
@@ -85,7 +95,7 @@ public.users.country_code
 └── 📜 public.get_user_region (Function Body Usage)
 ```
 
-### 3. Real-Time Monitoring
+### 4. Real-Time Monitoring
 Debug performance issues live during incidents without leaving your terminal.
 ```bash
 $ dbgraph top --watch --sort total
